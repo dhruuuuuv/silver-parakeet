@@ -3,14 +3,40 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 45, 45, 45;
-  --background-rgb: 248, 248, 248;
+  --foreground-rgb: 0, 0, 0;
+  --background-rgb: 255, 255, 255;
 }
 
 body {
   color: rgb(var(--foreground-rgb));
   background: rgb(var(--background-rgb));
-  min-height: 100vh;
+}
+
+@layer base {
+  h1 {
+    @apply text-4xl font-semibold tracking-tight mb-6;
+  }
+  h2 {
+    @apply text-2xl font-medium tracking-tight mb-4;
+  }
+  h3 {
+    @apply text-xl font-medium tracking-tight mb-3;
+  }
+  p {
+    @apply text-base leading-relaxed mb-4;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 font-medium text-sm tracking-wide uppercase;
+  }
+  .btn-primary {
+    @apply bg-black text-white hover:bg-gray-900;
+  }
+  .btn-secondary {
+    @apply bg-white text-black border border-black hover:bg-gray-50;
+  }
 }
 
 /* Glass effect */
