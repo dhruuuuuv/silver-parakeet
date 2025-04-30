@@ -1,12 +1,16 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
+import { IBM_Plex_Mono } from 'next/font/google';
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'] });
+const ibmPlexMono = IBM_Plex_Mono({
+  weight: ['400', '500', '600'],
+  subsets: ['latin'],
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
-  title: 'Music Recognition App',
-  description: 'Recognize songs with a simple retro interface',
+  title: 'Music Lineage',
+  description: 'Discover the musical lineage of any song',
 };
 
 export default function RootLayout({
@@ -15,9 +19,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className="h-full">
-      <body className={`${inter.className} antialiased h-full bg-grayscale-50 text-grayscale-900`}>
-        {children}
+    <html lang="en" className={ibmPlexMono.className}>
+      <body className="min-h-screen bg-white text-black antialiased">
+        <main className="container mx-auto px-4 py-8 max-w-3xl">
+          {children}
+        </main>
       </body>
     </html>
   );
