@@ -1,191 +1,215 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { recognizeAudio } from '@/utils/api';
 import { SongMetadata } from '@/types/song';
 
 const RECORD_DURATION = 10000; // 10 seconds
-const COOLDOWN_DURATION = 5000; // 5 seconds wait between recognitions
-const AUDIO_THRESHOLD = -50; // dB threshold for detecting significant audio
 
 interface AudioRecorderProps {
-  onSongRecognized?: (song: SongMetadata) => void;
+  onSongRecognized: (song: SongMetadata) => void;
 }
 
-export default function AudioRecorder({ onSongRecognized }: AudioRecorderProps) {
-  const [isMonitoring, setIsMonitoring] = useState(false);
-  const [isRecognizing, setIsRecognizing] = useState(false);
+const AudioRecorder: React.FC<AudioRecorderProps> = ({ onSongRecognized }) => {
+  const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(RECORD_DURATION / 1000);
+  const [audioLevel, setAudioLevel] = useState(0);
   
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-  const isProcessingRef = useRef(false);
-  const monitorFrameRef = useRef<number | null>(null);
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
 
-  const calculateDB = useCallback((analyser: AnalyserNode) => {
-    const array = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteFrequencyData(array);
-    const average = array.reduce((a, b) => a + b) / array.length;
-    return 20 * Math.log10(average / 255);
-  }, []);
-
-  const stopCurrentRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+  // Countdown effect
+  useEffect(() => {
+    if (isRecording) {
+      countdownRef.current = setInterval(() => {
+        setCountdown(prev => {
+          if (prev <= 1) {
+            if (countdownRef.current) clearInterval(countdownRef.current);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    } else {
+      setCountdown(RECORD_DURATION / 1000);
     }
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    if (monitorFrameRef.current) {
-      cancelAnimationFrame(monitorFrameRef.current);
-    }
-  }, []);
 
-  const startMonitoring = useCallback(() => {
-    if (!analyserRef.current || !isMonitoring) return;
-
-    const checkLevel = () => {
-      if (!isMonitoring) return;
-
-      const db = calculateDB(analyserRef.current!);
-      
-      if (db > AUDIO_THRESHOLD && !isProcessingRef.current) {
-        isProcessingRef.current = true;
-        startNewRecording();
-      } else {
-        monitorFrameRef.current = requestAnimationFrame(checkLevel);
+    return () => {
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
       }
     };
+  }, [isRecording]);
 
-    monitorFrameRef.current = requestAnimationFrame(checkLevel);
-  }, [isMonitoring, calculateDB]);
+  // Audio level monitoring
+  const checkAudioLevel = () => {
+    if (!analyserRef.current) return;
 
-  const processAudioChunks = useCallback(async () => {
-    if (chunksRef.current.length === 0) return;
-    
+    const array = new Uint8Array(analyserRef.current.frequencyBinCount);
+    analyserRef.current.getByteFrequencyData(array);
+    const average = array.reduce((a, b) => a + b) / array.length;
+    setAudioLevel(average);
+
+    animationFrameRef.current = requestAnimationFrame(checkAudioLevel);
+  };
+
+  const startRecording = async () => {
     try {
-      setIsRecognizing(true);
-      setError(null);
-      const blob = new Blob(chunksRef.current, { type: 'audio/webm' });
-      chunksRef.current = []; // Clear for next recording
-      
-      const songMetadata = await recognizeAudio(blob);
-      if (songMetadata) {
-        onSongRecognized?.(songMetadata);
-      }
-      
-    } catch (error) {
-      console.error('Error recognizing song:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to recognize song';
-      setError(errorMessage);
-      setTimeout(() => setError(null), 5000);
-    } finally {
-      setIsRecognizing(false);
-      isProcessingRef.current = false;
-      
-      // Resume monitoring after cooldown
-      setTimeout(() => {
-        if (isMonitoring) {
-          startMonitoring();
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
         }
-      }, COOLDOWN_DURATION);
-    }
-  }, [onSongRecognized, isMonitoring, startMonitoring]);
-
-  const startNewRecording = useCallback(async () => {
-    if (isProcessingRef.current) return;
-    
-    try {
-      stopCurrentRecording();
-      chunksRef.current = [];
-
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      });
       
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
-        const source = audioContextRef.current.createMediaStreamSource(stream);
-        analyserRef.current = audioContextRef.current.createAnalyser();
-        source.connect(analyserRef.current);
-      }
+      // Set up audio analysis
+      audioContextRef.current = new AudioContext();
+      const source = audioContextRef.current.createMediaStreamSource(stream);
+      analyserRef.current = audioContextRef.current.createAnalyser();
+      analyserRef.current.fftSize = 2048;
+      source.connect(analyserRef.current);
+      
+      // Start monitoring audio level
+      checkAudioLevel();
 
-      const mediaRecorder = new MediaRecorder(stream);
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm'
+      });
+      
       mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
 
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          chunksRef.current.push(event.data);
+          audioChunksRef.current.push(event.data);
         }
       };
 
-      mediaRecorder.onstop = () => {
-        processAudioChunks();
+      mediaRecorder.onstop = async () => {
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+        }
+        
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        console.log('Audio level during recording:', audioLevel);
+        
+        if (audioLevel < 5) {
+          setError('No audio detected. Please make sure music is playing and microphone is working.');
+          return;
+        }
+
+        try {
+          const song = await recognizeAudio(audioBlob);
+          onSongRecognized(song);
+        } catch (err) {
+          console.error('Recognition error:', err);
+          setError(err instanceof Error ? err.message : 'Failed to recognize song');
+        }
       };
 
       mediaRecorder.start();
+      setIsRecording(true);
+      setError(null);
+
+      // Stop recording after RECORD_DURATION
       timeoutRef.current = setTimeout(() => {
         if (mediaRecorder.state === 'recording') {
           mediaRecorder.stop();
           stream.getTracks().forEach(track => track.stop());
+          if (audioContextRef.current) {
+            audioContextRef.current.close();
+          }
+          setIsRecording(false);
         }
       }, RECORD_DURATION);
 
-    } catch (error) {
-      console.error('Error starting recording:', error);
-      setError('Could not access microphone. Please ensure you have granted permission.');
-      setIsMonitoring(false);
-      isProcessingRef.current = false;
+    } catch (err) {
+      console.error('Recording error:', err);
+      setError('Failed to access microphone. Please ensure you have granted permission.');
     }
-  }, [stopCurrentRecording, processAudioChunks]);
+  };
 
-  useEffect(() => {
-    if (isMonitoring) {
-      startNewRecording();
-    } else {
-      stopCurrentRecording();
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+      }
+      
+      // Stop media recorder
+      mediaRecorderRef.current.stop();
+      
+      // Stop all tracks
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      
+      // Clean up audio context
       if (audioContextRef.current) {
         audioContextRef.current.close();
         audioContextRef.current = null;
       }
+      
+      // Clean up analyser
+      analyserRef.current = null;
+      
+      setIsRecording(false);
     }
+  };
 
+  // Add cleanup on unmount
+  useEffect(() => {
     return () => {
-      stopCurrentRecording();
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (countdownRef.current) {
+        clearInterval(countdownRef.current);
+      }
+      if (mediaRecorderRef.current) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
       if (audioContextRef.current) {
         audioContextRef.current.close();
       }
     };
-  }, [isMonitoring, startNewRecording, stopCurrentRecording]);
+  }, []);
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    <div className="space-y-4">
       <button
-        onClick={() => setIsMonitoring(!isMonitoring)}
-        className={`
-          px-6 py-3 rounded font-mono text-lg transition-all duration-300
-          ${isMonitoring 
-            ? 'bg-orange-400 hover:bg-orange-500 text-orange-50 ring-2 ring-orange-400' 
-            : 'bg-orange-400 hover:bg-orange-500 text-orange-50'
-          }
-        `}
+        onClick={isRecording ? stopRecording : startRecording}
+        className={`btn ${isRecording ? 'btn-secondary' : 'btn-primary'}`}
       >
-        {isMonitoring ? 'Stop Listening' : 'Start Listening'}
+        {isRecording ? 'Stop Recording' : 'Start Recording'}
       </button>
-      
-      {isRecognizing && (
-        <div className="text-orange-400 font-mono">
-          Recognizing song...
+      {isRecording && (
+        <div className="space-y-2">
+          <p className="text-sm">Recording... {countdown}s</p>
+          <div className="h-2 bg-gray-200 rounded-full">
+            <div 
+              className="h-full bg-black rounded-full transition-all duration-100"
+              style={{ width: `${Math.min(100, (audioLevel / 255) * 100)}%` }}
+            />
+          </div>
         </div>
       )}
-      
-      {error && (
-        <div className="text-orange-400 text-center font-mono">
-          {error}
-        </div>
-      )}
+      {error && <p className="text-sm">{error}</p>}
     </div>
   );
-}
+};
+
+export default AudioRecorder;

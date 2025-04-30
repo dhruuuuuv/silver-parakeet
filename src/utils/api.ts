@@ -122,80 +122,45 @@ interface SpotifyImage {
   height: number;
 }
 
-export async function recognizeAudio(audioBlob: Blob): Promise<SongMetadata> {
+const AUDD_API_KEY = process.env.NEXT_PUBLIC_AUDD_API_KEY;
+
+export const recognizeAudio = async (audioBlob: Blob): Promise<SongMetadata> => {
+  if (!AUDD_API_KEY) {
+    throw new Error('Audd.io API key is not configured');
+  }
+
   const formData = new FormData();
   formData.append('file', audioBlob);
+  formData.append('api_token', AUDD_API_KEY);
   formData.append('return', 'spotify,apple_music');
-  formData.append('api_token', process.env.NEXT_PUBLIC_AUDD_API_KEY || '');
 
-  try {
-    const response = await fetch('https://api.audd.io/', {
-      method: 'POST',
-      body: formData,
-    });
+  const response = await fetch('https://api.audd.io/', {
+    method: 'POST',
+    body: formData,
+  });
 
-    if (!response.ok) {
-      throw new RecognitionError('Failed to connect to recognition service');
-    }
-
-    const data = await response.json();
-    
-    if (!data.result) {
-      throw new RecognitionError('No music detected. Make sure music is playing and try again.');
-    }
-
-    const { title, artist, album, release_date, spotify } = data.result;
-
-    // Get Spotify track ID from the URL
-    const spotifyId = spotify?.external_urls?.spotify?.split('/').pop();
-
-    // Parallel fetch all additional data
-    const [wikiData, lastfmData, musicBrainzData, geniusData, spotifyData, spotifyFeatures] = await Promise.all([
-      fetchWikipediaData(artist, title),
-      fetchLastFMData(artist, title),
-      fetchMusicBrainzData(artist, title),
-      fetchGeniusLyrics(artist, title),
-      spotifyId ? fetchSpotifyData(spotifyId) : null,
-      spotifyId ? fetchSpotifyFeatures(spotifyId) : null,
-    ]);
-
-    // Get high-quality artwork (prefer Spotify's high-res images)
-    const artwork = spotifyData?.album?.images?.sort((a: SpotifyImage, b: SpotifyImage) => b.width - a.width)[0]?.url || 
-                   spotify?.album?.images?.sort((a: SpotifyImage, b: SpotifyImage) => b.width - a.width)[0]?.url;
-
-    // Combine all metadata
-    return {
-      title,
-      artist,
-      album,
-      releaseDate: release_date,
-      artworkUrl: artwork,
-      spotifyId: spotify?.external_urls?.spotify,
-      wikiSummary: wikiData?.extract,
-      artistBio: lastfmData?.artist?.bio?.content,
-      genres: spotifyData?.genres || spotify?.album?.genres || [],
-      popularity: spotifyData?.popularity,
-      trackFeatures: spotifyFeatures,
-      credits: {
-        producers: musicBrainzData?.recordings?.[0]?.credits?.producer || [],
-        writers: musicBrainzData?.recordings?.[0]?.credits?.writer || [],
-        label: spotifyData?.album?.label || spotify?.album?.label
-      },
-      lastfmTags: lastfmData?.track?.toptags?.tag?.map((t: any) => t.name) || [],
-      musicBrainzData: {
-        recordingId: musicBrainzData?.recordings?.[0]?.id,
-        rating: musicBrainzData?.recordings?.[0]?.rating?.value
-      },
-      lyrics: geniusData?.response?.hits?.[0]?.result?.url
-    };
-  } catch (error) {
-    if (error instanceof RecognitionError) {
-      throw error;
-    }
-    console.error('Error recognizing song:', error);
-    throw new RecognitionError('Failed to recognize song. Please try again.');
+  const data = await response.json();
+  
+  if (data.status === 'error') {
+    throw new Error(data.error?.error_message || 'Failed to recognize song');
   }
-}
+
+  if (!data.result) {
+    throw new Error('No song recognized');
+  }
+
+  return {
+    title: data.result.title,
+    artist: data.result.artist,
+    album: data.result.album,
+    releaseDate: data.result.release_date,
+    spotifyId: data.result.spotify?.external_urls?.spotify,
+    appleMusicUrl: data.result.apple_music?.url,
+    bandcampUrl: undefined,
+    lineage: undefined,
+    linerNotes: undefined
+  };
+};
 
 async function fetchWikipediaData(artist: string, title: string) {
   try {
@@ -221,8 +186,10 @@ async function fetchWikipediaData(artist: string, title: string) {
 export async function generateLinerNotes(song: SongMetadata): Promise<string> {
   if (!GEMINI_API_KEY) throw new Error('Gemini API key not found');
 
-  const prompt = `Write concise liner notes (max 200 words) for ${song.artist}'s ${song.title}${song.album ? ` from the album ${song.album}` : ''}. 
-  Focus on the musical style, cultural context, and significance. Be factual and engaging.`;
+  const prompt = `Write liner notes for ${song.artist}'s ${song.title}${song.album ? ` from the album ${song.album}` : ''} in the style of Robert Christgau.
+  Be concise (max 150 words), witty, and opinionated. Focus on the music's cultural impact and technical execution.
+  Use short, punchy sentences. Avoid academic language. Be willing to make bold claims.
+  Example style: "The bassline alone could power a small city. The vocals? Pure catharsis. This is what happens when punk meets disco and they decide to have a good time."`;
 
   try {
     const response = await fetch(`${GEMINI_API_URL}${GEMINI_API_KEY}`, {
@@ -258,13 +225,16 @@ export async function generateLinerNotes(song: SongMetadata): Promise<string> {
 export async function generateLineage(song: SongMetadata): Promise<SongMetadata['lineage']> {
   if (!GEMINI_API_KEY) throw new Error('Gemini API key not found');
 
-  const prompt = `Analyze the musical lineage of ${song.artist}'s ${song.title}${song.album ? ` from the album ${song.album}` : ''}. 
-  List 3-5 key musical influences, provide a brief historical context (max 100 words), and suggest 3 specific songs from related artists that share similar musical elements.
-  Return ONLY a valid JSON object with these exact keys: 
-  - influences (array of artist names)
-  - historicalContext (string)
-  - relatedArtists (array of artist names)
+  const prompt = `Analyze ${song.artist}'s ${song.title}${song.album ? ` from the album ${song.album}` : ''} in the style of Robert Christgau.
+  List 3-5 key musical influences (be specific about which songs/albums influenced this track).
+  Provide a brief, opinionated historical context (max 100 words) that places this song in its cultural moment.
+  Suggest 3 specific songs that share this track's DNA - be specific about why they're connected.
+  Return ONLY a valid JSON object with these exact keys:
+  - influences (array of specific songs/albums that influenced this track)
+  - historicalContext (string, in Christgau's style)
+  - relatedArtists (array of artists who share this track's musical approach)
   - recommendedSongs (array of 3 objects with {title: string, artist: string, reason: string})
+  Example style for historicalContext: "Dropped in '89 when the world needed it most. A middle finger to hair metal, a love letter to garage rock. Changed everything, then got forgotten. Typical."
   Do not include any markdown formatting or additional text.`;
 
   try {
@@ -291,15 +261,17 @@ export async function generateLineage(song: SongMetadata): Promise<SongMetadata[
       throw new Error('Invalid Gemini API response');
     }
 
-    const responseText = data.candidates[0].content.parts[0].text;
-    // Clean up any markdown formatting
-    const cleanJson = responseText.replace(/```json\n?|\n?```/g, '').trim();
-    return JSON.parse(cleanJson);
+    return {
+      influences: data.candidates[0].content.parts[0].influences,
+      historicalContext: data.candidates[0].content.parts[0].historicalContext,
+      relatedArtists: data.candidates[0].content.parts[0].relatedArtists,
+      recommendedSongs: data.candidates[0].content.parts[0].recommendedSongs
+    };
   } catch (error) {
     console.error('Gemini API error:', error);
     return {
       influences: [],
-      historicalContext: 'Unable to generate lineage at this time.',
+      historicalContext: '',
       relatedArtists: [],
       recommendedSongs: []
     };
@@ -320,7 +292,6 @@ export async function searchBandcamp(song: SongMetadata): Promise<string | null>
       return null;
     }
 
-    // Since we can't directly access the API, we'll return a search URL
     return `https://bandcamp.com/search?q=${encodeURIComponent(searchQuery)}`;
   } catch (error) {
     console.error('Bandcamp search error:', error);
