@@ -9,10 +9,9 @@ export default function Home() {
   const [currentSong, setCurrentSong] = useState<SongMetadata | null>(null);
 
   return (
-    <div className="space-y-12">
-      <div className="text-center">
-        <h1>where everything is music</h1>
-        <p className="mt-2">~ ~ ~</p>
+    <div className="space-y-12 py-24 mx-auto max-w-3xl">
+      <div className="text-left">
+        <h1 className="text-4xl font-bold font-triptych max-w-md">where everything is music*</h1>
       </div>
 
       <AudioRecorder onSongRecognized={setCurrentSong} />

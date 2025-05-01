@@ -26,7 +26,7 @@ interface Album3DProps {
 
 export function Album3D({ imageUrl }: Album3DProps) {
   return (
-    <div className="relative w-full h-[500px] rounded-xl overflow-hidden bg-gradient-to-b from-black/20 to-black/10">
+    <div className="relative w-full h-[500px] rounded-xl overflow-hidden bg-gradient-to-b from-[#444]/20 to-[#444]/10">
       <Canvas
         shadows
         dpr={[1, 2]}

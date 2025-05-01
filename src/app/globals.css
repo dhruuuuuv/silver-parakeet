@@ -3,13 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-rgb: 255, 255, 255;
+  --background-color: #F6ECE1;
+  --text-color: #444;
 }
 
 body {
-  color: rgb(var(--foreground-rgb));
-  background: rgb(var(--background-rgb));
+  background-color: var(--background-color);
+  color: var(--text-color);
 }
 
 @layer base {
@@ -29,13 +29,15 @@ body {
 
 @layer components {
   .btn {
-    @apply px-4 py-2 font-medium text-sm tracking-wide uppercase;
+    @apply px-4 py-2 rounded font-manifold-bold transition-colors duration-200;
   }
+
   .btn-primary {
-    @apply bg-black text-white hover:bg-gray-900;
+    @apply bg-[#444] text-[#F6ECE1] hover:bg-[#333];
   }
+
   .btn-secondary {
-    @apply bg-white text-black border border-black hover:bg-gray-50;
+    @apply bg-[#F6ECE1] text-[#444] border border-[#444] hover:bg-[#F0E4D5];
   }
 }
 
@@ -76,4 +78,57 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #b58b0d;
+}
+
+/* ASCII Loaders */
+.ascii-loader {
+  font-family: monospace;
+  white-space: pre;
+  line-height: 1;
+}
+
+.ascii-loader-1 {
+  animation: asciiLoader1 1s steps(4) infinite;
+}
+
+.ascii-loader-2 {
+  animation: asciiLoader2 1s steps(4) infinite;
+}
+
+@keyframes asciiLoader1 {
+  0% { content: "."; }
+  25% { content: ".."; }
+  50% { content: "..."; }
+  75% { content: "...."; }
+  100% { content: "."; }
+}
+
+@keyframes asciiLoader2 {
+  0% { content: "⠋"; }
+  25% { content: "⠙"; }
+  50% { content: "⠹"; }
+  75% { content: "⠸"; }
+  100% { content: "⠋"; }
+}
+
+@layer utilities {
+  .font-blanco {
+    font-family: var(--font-blanco-regular);
+  }
+  
+  .font-blanco-italic {
+    font-family: var(--font-blanco-italic);
+  }
+  
+  .font-triptych {
+    font-family: var(--font-triptych);
+  }
+  
+  .font-manifold {
+    font-family: var(--font-manifold-regular);
+  }
+  
+  .font-manifold-bold {
+    font-family: var(--font-manifold-bold);
+  }
 }
