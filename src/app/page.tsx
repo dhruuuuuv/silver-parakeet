@@ -16,7 +16,7 @@ export default function Home() {
 
       <AudioRecorder onSongRecognized={setCurrentSong} />
 
-      {currentSong && <SongDisplay song={currentSong} />}
+      {currentSong && <SongDisplay song={currentSong} onClose={() => setCurrentSong(null)} />}
     </div>
   );
 }

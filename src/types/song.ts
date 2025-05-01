@@ -14,7 +14,9 @@ export interface SongMetadata {
     tags?: string[];
     labels?: string[];
     externalLinks?: {
-      [key: string]: string;
+      streaming?: string;
+      purchase?: string;
+      download?: string;
     };
     [key: string]: any;
   };
@@ -25,10 +27,10 @@ export interface SongMetadata {
   lastfmTags?: string[];
   lyrics?: string;
   lineage?: {
-    influences: string[];
-    historicalContext: string;
-    relatedArtists: string[];
-    recommendedSongs: Array<{
+    influences?: string[];
+    historicalContext?: string;
+    relatedArtists?: string[];
+    recommendedSongs?: Array<{
       title: string;
       artist: string;
       reason: string;
@@ -36,6 +38,7 @@ export interface SongMetadata {
   };
   linerNotes?: string;
   bandcampUrl?: string;
+  tags?: string[];
 }
 
 export interface HistoryEntry extends SongMetadata {

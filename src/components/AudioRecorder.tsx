@@ -61,27 +61,72 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onSongRecognized }) => {
 
   const startRecording = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        audio: {
-          echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false
+      // Check if we already have a stream
+      if (mediaRecorderRef.current?.stream) {
+        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      }
+
+      // Request microphone access with retries
+      let stream;
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false
+            }
+          });
+          break;
+        } catch (err) {
+          retries--;
+          if (retries === 0) throw err;
+          await new Promise(resolve => setTimeout(resolve, 1000));
         }
-      });
+      }
       
-      // Set up audio analysis
-      audioContextRef.current = new AudioContext();
-      const source = audioContextRef.current.createMediaStreamSource(stream);
-      analyserRef.current = audioContextRef.current.createAnalyser();
-      analyserRef.current.fftSize = 2048;
-      source.connect(analyserRef.current);
+      if (!stream) throw new Error('Failed to access microphone after multiple attempts');
+      
+      // Set up audio analysis with retries
+      let audioContext;
+      let retriesContext = 3;
+      while (retriesContext > 0) {
+        try {
+          audioContext = new AudioContext();
+          const source = audioContext.createMediaStreamSource(stream);
+          analyserRef.current = audioContext.createAnalyser();
+          analyserRef.current.fftSize = 2048;
+          source.connect(analyserRef.current);
+          audioContextRef.current = audioContext;
+          break;
+        } catch (err) {
+          retriesContext--;
+          if (retriesContext === 0) throw err;
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
       
       // Start monitoring audio level
       checkAudioLevel();
 
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm'
-      });
+      // Create media recorder with retries
+      let mediaRecorder;
+      let retriesRecorder = 3;
+      while (retriesRecorder > 0) {
+        try {
+          mediaRecorder = new MediaRecorder(stream, {
+            mimeType: 'audio/webm'
+          });
+          break;
+        } catch (err) {
+          retriesRecorder--;
+          if (retriesRecorder === 0) throw err;
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      
+      if (!mediaRecorder) throw new Error('Failed to create MediaRecorder after multiple attempts');
       
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
@@ -132,7 +177,8 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onSongRecognized }) => {
 
     } catch (err) {
       console.error('Recording error:', err);
-      setError('Failed to access microphone. Please ensure you have granted permission.');
+      setError('Failed to access microphone. Please ensure you have granted permission and try again.');
+      setIsRecording(false);
     }
   };
 
@@ -189,17 +235,25 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onSongRecognized }) => {
   }, []);
 
   return (
-    <div className="flex flex-col items-start justify-start space-y-4">
+    <div className="flex flex-col items-start justify-start space-y-4 w-full">
       <button
         onClick={isRecording ? stopRecording : startRecording}
-        className={`btn ${isRecording ? 'btn-secondary' : 'btn-primary'}`}
+        className={`px-6 py-3 rounded font-manifold text-sm transition-all ${
+          isRecording 
+            ? 'bg-[#444] text-white hover:bg-[#333]' 
+            : 'bg-[#F6ECE1] text-[#444] border border-[#444] hover:bg-[#F0E0D0]'
+        }`}
       >
-        {isRecording ? 'stop' : 'start'}
+        {isRecording ? 'stop recording' : 'start recording'}
       </button>
+      
       {isRecording && (
-        <div className="space-y-2">
-          <p className="text-sm">Recording... {countdown}s</p>
-          <div className="h-2 bg-gray-200 rounded-full">
+        <div className="space-y-2 w-full max-w-md">
+          <div className="flex items-center justify-between">
+            <p className="font-manifold text-sm text-[#444]">recording...</p>
+            <p className="font-manifold text-sm text-[#444]">{countdown}s</p>
+          </div>
+          <div className="h-2 bg-[#F6ECE1] rounded-full overflow-hidden">
             <div 
               className="h-full bg-[#444] rounded-full transition-all duration-100"
               style={{ width: `${Math.min(100, (audioLevel / 255) * 100)}%` }}
@@ -207,7 +261,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onSongRecognized }) => {
           </div>
         </div>
       )}
-      {error && <p className="text-sm">{error}</p>}
+      
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg w-full max-w-md">
+          <p className="font-manifold text-sm text-red-600">{error}</p>
+        </div>
+      )}
     </div>
   );
 };

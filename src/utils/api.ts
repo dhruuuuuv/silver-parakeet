@@ -59,7 +59,7 @@ interface CoverArtImage {
   image: string;
 }
 
-export const recognizeAudio = async (audioBlob: Blob): Promise<SongMetadata> => {
+export const recognizeAudio = async (audioBlob: Blob, retries = 2): Promise<SongMetadata> => {
   if (!AUDD_API_KEY) {
     throw new Error('Audd.io API key is not configured');
   }
@@ -69,77 +69,106 @@ export const recognizeAudio = async (audioBlob: Blob): Promise<SongMetadata> => 
   formData.append('api_token', AUDD_API_KEY);
   formData.append('return', 'apple_music,deezer,musicbrainz');
 
-  const response = await fetch('https://api.audd.io/', {
-    method: 'POST',
-    body: formData,
-  });
+  try {
+    const response = await fetch('https://api.audd.io/', {
+      method: 'POST',
+      body: formData,
+    });
 
-  const data = await response.json();
-  
-  if (data.status === 'error') {
-    throw new Error(data.error?.error_message || 'Failed to recognize song');
-  }
-
-  if (!data.result) {
-    throw new Error('No song recognized');
-  }
-
-  // Get additional metadata from various sources - make these optional
-  const [musicBrainzData, wikiData] = await Promise.allSettled([
-    fetchMusicBrainzData(data.result.artist, data.result.title),
-    fetchWikipediaData(data.result.artist, data.result.title)
-  ]);
-
-  // Extract values from settled promises
-  const musicBrainzResult = musicBrainzData.status === 'fulfilled' ? musicBrainzData.value : null;
-  const wikiResult = wikiData.status === 'fulfilled' ? wikiData.value : null;
-
-  // Get artwork from multiple sources
-  let artworkUrl = null;
-  
-  // Try Apple Music first
-  if (data.result.apple_music?.artwork?.url) {
-    artworkUrl = data.result.apple_music.artwork.url.replace('{w}x{h}', '1000x1000');
-  }
-  
-  // Try Deezer next
-  if (!artworkUrl && data.result.deezer?.album?.cover) {
-    artworkUrl = data.result.deezer.album.cover;
-  }
-  
-  // Try MusicBrainz last
-  if (!artworkUrl && musicBrainzResult?.releases?.[0]?.id) {
-    const coverArtResponse = await fetch(`https://coverartarchive.org/release/${musicBrainzResult.releases[0].id}`);
-    if (coverArtResponse.ok) {
-      const coverArtData = await coverArtResponse.json();
-      artworkUrl = coverArtData.images?.find((img: CoverArtImage) => img.front)?.image;
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
     }
-  }
 
-  return {
-    title: data.result.title,
-    artist: data.result.artist,
-    album: data.result.album,
-    releaseDate: data.result.release_date,
-    artworkUrl,
-    appleMusicUrl: data.result.apple_music?.url,
-    musicBrainzData: musicBrainzResult ? {
-      id: musicBrainzResult.id,
-      rating: musicBrainzResult.rating?.value,
-      tags: musicBrainzResult.tags?.map((t: any) => t.name) || [],
-      labels: musicBrainzResult.releases?.map((r: any) => r.label) || [],
-      externalLinks: musicBrainzResult.relations?.reduce((acc: any, rel: any) => {
-        if (rel.type === 'streaming' || rel.type === 'purchase' || rel.type === 'download') {
-          acc[rel.type] = rel.url.resource;
-        }
-        return acc;
-      }, {}) || {}
-    } : undefined,
-    wikiSummary: wikiResult?.extract,
-    bandcampUrl: undefined,
-    lineage: undefined,
-    linerNotes: undefined
-  };
+    const data = await response.json();
+    
+    if (data.status === 'error') {
+      throw new Error(data.error?.error_message || 'Failed to recognize song');
+    }
+
+    if (!data.result) {
+      if (retries > 0) {
+        // Wait a bit before retrying
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return recognizeAudio(audioBlob, retries - 1);
+      }
+      throw new Error('No song recognized after multiple attempts');
+    }
+
+    // Validate the result
+    if (!data.result.title || !data.result.artist) {
+      if (retries > 0) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return recognizeAudio(audioBlob, retries - 1);
+      }
+      throw new Error('Incomplete song data received');
+    }
+
+    // Get additional metadata from various sources - make these optional
+    const [musicBrainzData, wikiData] = await Promise.allSettled([
+      fetchMusicBrainzData(data.result.artist, data.result.title),
+      fetchWikipediaData(data.result.artist, data.result.title)
+    ]);
+
+    // Extract values from settled promises
+    const musicBrainzResult = musicBrainzData.status === 'fulfilled' ? musicBrainzData.value : null;
+    const wikiResult = wikiData.status === 'fulfilled' ? wikiData.value : null;
+
+    // Get artwork from multiple sources
+    let artworkUrl = null;
+    
+    // Try Apple Music first
+    if (data.result.apple_music?.artwork?.url) {
+      artworkUrl = data.result.apple_music.artwork.url.replace('{w}x{h}', '1000x1000');
+    }
+    
+    // Try Deezer next
+    if (!artworkUrl && data.result.deezer?.album?.cover) {
+      artworkUrl = data.result.deezer.album.cover;
+    }
+    
+    // Try MusicBrainz last
+    if (!artworkUrl && musicBrainzResult?.releases?.[0]?.id) {
+      const coverArtResponse = await fetch(`https://coverartarchive.org/release/${musicBrainzResult.releases[0].id}`);
+      if (coverArtResponse.ok) {
+        const coverArtData = await coverArtResponse.json();
+        artworkUrl = coverArtData.images?.find((img: CoverArtImage) => img.front)?.image;
+      }
+    }
+
+    return {
+      title: data.result.title,
+      artist: data.result.artist,
+      album: data.result.album || data.result.apple_music?.album?.name || data.result.deezer?.album?.title,
+      releaseDate: data.result.release_date,
+      artworkUrl,
+      appleMusicUrl: data.result.apple_music?.url,
+      musicBrainzData: musicBrainzResult ? {
+        id: musicBrainzResult.id,
+        rating: musicBrainzResult.rating?.value,
+        tags: musicBrainzResult.tags?.map((t: any) => t.name) || [],
+        labels: musicBrainzResult.releases?.map((r: any) => r.label) || [],
+        externalLinks: musicBrainzResult.relations?.reduce((acc: any, rel: any) => {
+          if (rel.type === 'streaming' || rel.type === 'purchase' || rel.type === 'download') {
+            acc[rel.type] = rel.url.resource;
+          }
+          return acc;
+        }, {}) || {}
+      } : undefined,
+      wikiSummary: wikiResult?.extract,
+      bandcampUrl: undefined,
+      lineage: undefined,
+      linerNotes: undefined,
+      genres: data.result.genres || [],
+      tags: data.result.tags || []
+    };
+  } catch (error) {
+    if (retries > 0) {
+      // Wait a bit before retrying
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return recognizeAudio(audioBlob, retries - 1);
+    }
+    throw error;
+  }
 };
 
 async function fetchWikipediaData(artist: string, title: string) {
@@ -201,8 +230,8 @@ async function fetchWikipediaData(artist: string, title: string) {
 export async function generateLinerNotes(song: SongMetadata): Promise<string> {
   if (!GEMINI_API_KEY) throw new Error('Gemini API key not found');
 
-  const prompt = `You're functioning as a musicologist / ethnomusicologist. This is displayed in a cafe where music is playing, and aim to simulate vinyl liner notes.Write liner notes for ${song.artist}'s ${song.title}${song.album ? ` from the album ${song.album}` : ''} in the style of Ted Gioia, without making any reference to that fact.
-  Be concise (max 150 words), Focus on the music's cultural impact and technical execution.`;
+  const prompt = `Write really simple and accurate liner notes for ${song.artist}'s ${song.title}${song.album ? ` from the album ${song.album}` : ''} in the style of Ted Gioia, without making any reference to that fact.
+  Be concise, Focus on the music's cultural impact and technical execution, whilst also describing the process, from wikipedia and interviews. Be accurate`;
 
   try {
     const response = await fetch(`${GEMINI_API_URL}${GEMINI_API_KEY}`, {
@@ -254,11 +283,11 @@ export async function generateLineage(song: SongMetadata): Promise<SongMetadata[
   - Wiki Context: ${context.wikiSummary}
   - MusicBrainz Tags: ${context.musicBrainzTags}
 
-  Provide a detailed analysis in the style of Ted Gioia, focusing on:
-  1. Cultural and historical context (150-200 words) - trace the musical traditions, migrations, and cultural movements that influenced this work
-  2. Key musical influences (3-5 specific works) - identify precise songs/albums that directly influenced this track
+  Provide a consise, easy to read analysis in the style of Ted Gioia, focusing on:
+  1. Cultural and historical context - trace the musical traditions, migrations, and cultural movements that influenced this work, being as accurate as possible.
+  2. Key musical influences (up to 3 significant influences on the general genre and style of the music, so someone can learn about the history
   3. Related artists (3-5) - artists who share similar musical DNA and cultural influences
-  4. Recommended listening (3 tracks) - specific songs that demonstrate the evolution of this musical style
+  4. Recommended listening (3 tracks) - specific songs that demonstrate the evolution of this musical style through history and time
 
   Return ONLY a valid JSON object with these exact keys:
   - historicalContext (string)
