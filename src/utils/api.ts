@@ -231,7 +231,7 @@ export async function generateLinerNotes(song: SongMetadata): Promise<string> {
   if (!GEMINI_API_KEY) throw new Error('Gemini API key not found');
 
   const prompt = `Write really simple and accurate liner notes for ${song.artist}'s ${song.title}${song.album ? ` from the album ${song.album}` : ''} in the style of Ted Gioia, without making any reference to that fact.
-  Be concise, Focus on the music's cultural impact and technical execution, whilst also describing the process, from wikipedia and interviews. Be accurate`;
+  Be concise, Focus on the music's cultural impact and technical execution, whilst also describing the process, from wikipedia and interviews. Be accurate, and don't make up any information. You can return multiple short paragraphs with two line spaces between.`;
 
   try {
     const response = await fetch(`${GEMINI_API_URL}${GEMINI_API_KEY}`, {

@@ -132,54 +132,54 @@ export default function SongDisplay({ song, onClose }: SongDisplayProps) {
         </div>
 
         <div className="max-w-3xl mx-auto text-left space-y-8">
-          <div className="space-y-2">
+          <div className="space-y-4">
             <div>
               <span className="text-sm font-triptych text-[#444]/60">♪ title</span>
-              <h1 className="font-bold font-triptych text-5xl">{song.title}</h1>
+              <h1 className="font-bold font-triptych text-5xl mt-1">{song.title}</h1>
             </div>
             <div>
               <span className="text-sm font-triptych text-[#444]/60">♫ artist</span>
-              <h2 className="font-bold font-triptych text-4xl">{song.artist}</h2>
+              <h2 className="font-bold font-triptych text-4xl mt-1">{song.artist}</h2>
             </div>
             {song.album && (
               <div>
                 <span className="text-sm font-triptych text-[#444]/60">♬ album</span>
-                <h3 className="font-bold font-triptych text-3xl">{song.album}</h3>
+                <h3 className="font-bold font-triptych text-3xl mt-1">{song.album}</h3>
               </div>
             )}
           </div>
 
           {linerNotes && (
-            <div>
+            <div className="mt-12">
               <h2 className="font-bold font-triptych text-3xl">✎ Liner Notes</h2>
-              <p>{linerNotes}</p>
+              <p className="mt-4 leading-relaxed">{linerNotes}</p>
             </div>
           )}
 
           {lineage && (
-            <div>
+            <div className="mt-12">
               <h2 className="font-bold font-triptych text-3xl">Lineage</h2>
-              <div className="space-y-4">
+              <div className="space-y-8 mt-6">
                 <div>
                   <h3 className="font-bold font-triptych text-2xl">⇢ Influences</h3>
-                  <p>{lineage.influences?.join(' • ') || 'No influences found'}</p>
+                  <p className="mt-3 leading-relaxed">{lineage.influences?.join(' • ') || 'No influences found'}</p>
                 </div>
                 <div>
                   <h3 className="font-bold font-triptych text-2xl">⌛ Context</h3>
-                  <p>{lineage.historicalContext || 'No historical context found'}</p>
+                  <p className="mt-3 leading-relaxed">{lineage.historicalContext || 'No historical context found'}</p>
                 </div>
                 <div>
                   <h3 className="font-bold font-triptych text-2xl">↔ Related Artists</h3>
-                  <p>{lineage.relatedArtists?.join(' • ') || 'No related artists found'}</p>
+                  <p className="mt-3 leading-relaxed">{lineage.relatedArtists?.join(' • ') || 'No related artists found'}</p>
                 </div>
                 <div>
                   <h3 className="font-bold font-triptych text-2xl">★ Recommended Songs</h3>
-                  <ul className="list-disc pl-4">
+                  <ul className="mt-3 space-y-3 list-disc pl-4">
                     {lineage.recommendedSongs?.map((song, index) => (
-                      <li key={index}>
+                      <li key={index} className="leading-relaxed">
                         {song.title} by {song.artist} - {song.reason}
                       </li>
-                    )) || <li>No recommendations found</li>}
+                    )) || <li className="leading-relaxed">No recommendations found</li>}
                   </ul>
                 </div>
               </div>
@@ -187,13 +187,13 @@ export default function SongDisplay({ song, onClose }: SongDisplayProps) {
           )}
 
           {song.genres && song.genres.length > 0 && (
-            <div>
+            <div className="mt-12">
               <h3 className="font-bold font-triptych text-2xl">♪ Genres</h3>
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="flex flex-wrap gap-3 mt-4">
                 {song.genres.map((genre, index) => (
                   <span
                     key={index}
-                    className="px-3 py-1 bg-[#F6ECE1] border border-[#444] rounded font-manifold text-sm"
+                    className="px-4 py-2 bg-[#F6ECE1] border border-[#444] rounded font-manifold text-sm"
                   >
                     {genre}
                   </span>
@@ -203,13 +203,13 @@ export default function SongDisplay({ song, onClose }: SongDisplayProps) {
           )}
 
           {song.tags && song.tags.length > 0 && (
-            <div>
+            <div className="mt-12">
               <h3 className="font-bold font-triptych text-2xl"># Tags</h3>
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="flex flex-wrap gap-3 mt-4">
                 {song.tags.map((tag, index) => (
                   <span
                     key={index}
-                    className="px-3 py-1 bg-[#F6ECE1] border border-[#444] rounded font-manifold text-sm"
+                    className="px-4 py-2 bg-[#F6ECE1] border border-[#444] rounded font-manifold text-sm"
                   >
                     {tag}
                   </span>
@@ -219,13 +219,13 @@ export default function SongDisplay({ song, onClose }: SongDisplayProps) {
           )}
 
           {song.musicBrainzData?.tags && song.musicBrainzData.tags.length > 0 && (
-            <div>
+            <div className="mt-12">
               <h3 className="font-bold font-triptych text-2xl"># Tags</h3>
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="flex flex-wrap gap-3 mt-4">
                 {song.musicBrainzData.tags.map((tag, index) => (
                   <span
                     key={index}
-                    className="px-3 py-1 bg-[#F6ECE1] border border-[#444] rounded font-manifold text-sm"
+                    className="px-4 py-2 bg-[#F6ECE1] border border-[#444] rounded font-manifold text-sm"
                   >
                     {tag}
                   </span>
@@ -235,7 +235,7 @@ export default function SongDisplay({ song, onClose }: SongDisplayProps) {
           )}
 
           {bandcampUrl && (
-            <div>
+            <div className="mt-12">
               <a href={bandcampUrl} className="btn btn-secondary">
                 ♪ Find on Bandcamp
               </a>
@@ -243,13 +243,15 @@ export default function SongDisplay({ song, onClose }: SongDisplayProps) {
           )}
 
           {song.credits && Object.keys(song.credits).length > 0 && (
-            <div>
+            <div className="mt-12">
               <h3 className="font-bold font-triptych text-2xl">👥 Credits</h3>
-              <div className="space-y-2 mt-2">
+              <div className="space-y-4 mt-4">
                 {Object.entries(song.credits).map(([role, names], index) => (
                   <div key={index}>
                     <p className="text-sm font-mono text-grayscale-500">{role}</p>
-                    <p className="font-mono text-grayscale-900">{Array.isArray(names) ? names.join(', ') : names}</p>
+                    <p className="font-mono text-grayscale-900 mt-1 leading-relaxed">
+                      {Array.isArray(names) ? names.join(', ') : names}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -257,9 +259,9 @@ export default function SongDisplay({ song, onClose }: SongDisplayProps) {
           )}
 
           {song.wikiSummary && (
-            <div>
+            <div className="mt-12">
               <h3 className="font-bold font-triptych text-2xl">ℹ About</h3>
-              <p className="mt-2 text-sm leading-relaxed">
+              <p className="mt-4 text-sm leading-relaxed">
                 {song.wikiSummary}
               </p>
             </div>
