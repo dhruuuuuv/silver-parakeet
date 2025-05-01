@@ -186,10 +186,8 @@ async function fetchWikipediaData(artist: string, title: string) {
 export async function generateLinerNotes(song: SongMetadata): Promise<string> {
   if (!GEMINI_API_KEY) throw new Error('Gemini API key not found');
 
-  const prompt = `Write liner notes for ${song.artist}'s ${song.title}${song.album ? ` from the album ${song.album}` : ''} in the style of Robert Christgau.
-  Be concise (max 150 words), witty, and opinionated. Focus on the music's cultural impact and technical execution.
-  Use short, punchy sentences. Avoid academic language. Be willing to make bold claims.
-  Example style: "The bassline alone could power a small city. The vocals? Pure catharsis. This is what happens when punk meets disco and they decide to have a good time."`;
+  const prompt = `You're functioning as a musicologist / ethnomusicologist. This is displayed in a cafe where music is playing, and aim to simulate vinyl liner notes.Write liner notes for ${song.artist}'s ${song.title}${song.album ? ` from the album ${song.album}` : ''} in the style of Ted Gioia, without making any reference to that fact.
+  Be concise (max 150 words), Focus on the music's cultural impact and technical execution.`;
 
   try {
     const response = await fetch(`${GEMINI_API_URL}${GEMINI_API_KEY}`, {
@@ -225,16 +223,15 @@ export async function generateLinerNotes(song: SongMetadata): Promise<string> {
 export async function generateLineage(song: SongMetadata): Promise<SongMetadata['lineage']> {
   if (!GEMINI_API_KEY) throw new Error('Gemini API key not found');
 
-  const prompt = `Analyze ${song.artist}'s ${song.title}${song.album ? ` from the album ${song.album}` : ''} in the style of Robert Christgau.
-  List 3-5 key musical influences (be specific about which songs/albums influenced this track).
-  Provide a brief, opinionated historical context (max 100 words) that places this song in its cultural moment.
-  Suggest 3 specific songs that share this track's DNA - be specific about why they're connected.
+  const prompt = `You're adopting the role of a musicologist / ethnomusicologist. Describe ${song.artist}'s ${song.title}${song.album ? ` from the album ${song.album}` : ''} in the style of Ted Gioia.
+  List 3-5 key historial musical influences (be specific about which songs/albums influenced this track).
+  Provide a brief historical context (max 100 words) that explores where this music comes from and what it was influenced by. If migration of people or ideas is a factor, mention it, tie it into cultural history.
+  Suggest 3 specific songs that share this track's DNA from history - be specific about why they're connected.
   Return ONLY a valid JSON object with these exact keys:
-  - influences (array of specific songs/albums that influenced this track)
-  - historicalContext (string, in Christgau's style)
+  - influences (array of specific songs/albums that influenced this track, at a big scale)
+  - historicalContext (string, in Ted Gioia's style)
   - relatedArtists (array of artists who share this track's musical approach)
   - recommendedSongs (array of 3 objects with {title: string, artist: string, reason: string})
-  Example style for historicalContext: "Dropped in '89 when the world needed it most. A middle finger to hair metal, a love letter to garage rock. Changed everything, then got forgotten. Typical."
   Do not include any markdown formatting or additional text.`;
 
   try {
@@ -261,11 +258,16 @@ export async function generateLineage(song: SongMetadata): Promise<SongMetadata[
       throw new Error('Invalid Gemini API response');
     }
 
+    const responseText = data.candidates[0].content.parts[0].text;
+    // Strip markdown code block syntax if present
+    const cleanJson = responseText.replace(/```json\n?|\n?```/g, '').trim();
+    const parsedResponse = JSON.parse(cleanJson);
+
     return {
-      influences: data.candidates[0].content.parts[0].influences,
-      historicalContext: data.candidates[0].content.parts[0].historicalContext,
-      relatedArtists: data.candidates[0].content.parts[0].relatedArtists,
-      recommendedSongs: data.candidates[0].content.parts[0].recommendedSongs
+      influences: parsedResponse.influences,
+      historicalContext: parsedResponse.historicalContext,
+      relatedArtists: parsedResponse.relatedArtists,
+      recommendedSongs: parsedResponse.recommendedSongs
     };
   } catch (error) {
     console.error('Gemini API error:', error);
@@ -279,22 +281,22 @@ export async function generateLineage(song: SongMetadata): Promise<SongMetadata[
 }
 
 export async function searchBandcamp(song: SongMetadata): Promise<string | null> {
-  try {
-    const searchQuery = `${song.artist} ${song.title} ${song.album || ''}`;
-    const response = await fetch(`https://bandcamp.com/search?q=${encodeURIComponent(searchQuery)}`, {
-      headers: {
-        'Accept': 'text/html',
-      }
-    });
+  // try {
+  //   const searchQuery = `${song.artist} ${song.title} ${song.album || ''}`;
+  //   const response = await fetch(`https://bandcamp.com/search?q=${encodeURIComponent(searchQuery)}`, {
+  //     headers: {
+  //       'Accept': 'text/html',
+  //     }
+  //   });
     
-    if (!response.ok) {
-      console.warn('Bandcamp search returned non-200 status:', response.status);
-      return null;
-    }
+  //   if (!response.ok) {
+  //     console.warn('Bandcamp search returned non-200 status:', response.status);
+  //     return null;
+  //   }
 
-    return `https://bandcamp.com/search?q=${encodeURIComponent(searchQuery)}`;
-  } catch (error) {
-    console.error('Bandcamp search error:', error);
+  //   return `https://bandcamp.com/search?q=${encodeURIComponent(searchQuery)}`;
+  // } catch (error) {
+  //   console.error('Bandcamp search error:', error);
     return null;
-  }
+  // }
 }
