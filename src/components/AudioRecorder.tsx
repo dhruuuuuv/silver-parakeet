@@ -189,7 +189,7 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({ onSongRecognized }) => {
   }, []);
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col items-center justify-center space-y-4">
       <button
         onClick={isRecording ? stopRecording : startRecording}
         className={`btn ${isRecording ? 'btn-secondary' : 'btn-primary'}`}
