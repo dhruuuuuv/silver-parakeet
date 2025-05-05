@@ -2,6 +2,7 @@ export interface SongMetadata {
   title: string;
   artist: string;
   album?: string;
+  year?: number;
   releaseDate?: string;
   artworkUrl?: string;
   appleMusicUrl?: string;
@@ -35,6 +36,7 @@ export interface SongMetadata {
       artist: string;
       reason: string;
     }>;
+    regions?: string[];
   };
   linerNotes?: string;
   bandcampUrl?: string;

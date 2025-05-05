@@ -150,15 +150,15 @@ export default function SongDisplay({ song, onClose }: SongDisplayProps) {
           </div>
 
           {linerNotes && (
-            <div className="mt-12">
-              <h2 className="font-bold font-triptych text-3xl">✎ Liner Notes</h2>
+            <div className="mt-24">
+              <h2 className="font-bold font-triptych text-5xl">✎ Liner Notes</h2>
               <p className="mt-4 leading-relaxed">{linerNotes}</p>
             </div>
           )}
 
           {lineage && (
-            <div className="mt-12">
-              <h2 className="font-bold font-triptych text-3xl">Lineage</h2>
+            <div className="mt-24">
+              <h2 className="font-bold font-triptych text-6xl">Lineage</h2>
               <div className="space-y-8 mt-6">
                 <div>
                   <h3 className="font-bold font-triptych text-2xl">⇢ Influences</h3>
@@ -168,6 +168,7 @@ export default function SongDisplay({ song, onClose }: SongDisplayProps) {
                   <h3 className="font-bold font-triptych text-2xl">⌛ Context</h3>
                   <p className="mt-3 leading-relaxed">{lineage.historicalContext || 'No historical context found'}</p>
                 </div>
+                <h2 className="mt-24 font-bold font-triptych text-4xl">Diving Deeper</h2>
                 <div>
                   <h3 className="font-bold font-triptych text-2xl">↔ Related Artists</h3>
                   <p className="mt-3 leading-relaxed">{lineage.relatedArtists?.join(' • ') || 'No related artists found'}</p>
